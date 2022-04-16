@@ -3,6 +3,8 @@ import win32com.client as client
 from rich.console import Console
 import os
 import os.path
+from shutil import rmtree
+
 
 outlook = client.Dispatch("Outlook.Application")
 name_space = outlook.GetNameSpace("MAPI")
@@ -10,8 +12,12 @@ console = Console(width=120)
 style = "bold grey0 on white"
 style1 = "blink turquoise2 on black"
 style2 = " green on black"
-
 lis = []
+
+MAIN_PATH = os.getcwd()
+FILES_DIR = os.path.join(MAIN_PATH, 'attachments')
+
+
 for i in name_space.Folders:
     lis.append(i.FolderPath)
     for j in i.Folders:
@@ -23,7 +29,7 @@ def search_mailitems(scope, sql_query):
 
     for name in name_space.Folders:
         for fol_i in name.Folders:
-            if (fol_i.FolderPath == scope):
+            if fol_i.FolderPath == scope:
                 for mi in fol_i.Items.Restrict(
                         "@SQL=" + sql_query):  # https://docs.microsoft.com/ru-ru/office/vba/api/outlook.items.restrict
                     if mi.Class == 43:
@@ -32,7 +38,19 @@ def search_mailitems(scope, sql_query):
 
 
 def get_create_date(j):
-    return str(j.Parent.CreationTime.strftime("%d %B %Y (%H'%M'%S) - "))
+    return j.Parent.CreationTime.strftime("%d %B %Y (%H'%M'%S) - ")
+
+
+def get_name_file(j):
+    return get_create_date(j) + j.FileName
+
+
+def mk_files_dir(path):
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    else:
+        if input('\nОчистить папку с файлами?') == 'y':
+            rmtree(path)
 
 
 def download_attach():
@@ -44,11 +62,12 @@ def download_attach():
     sql_query = console.input("\nСкопируй sql запрос из Outlook: ")
 
     mii = search_mailitems(scope, sql_query)
-    os.mkdir(os.getcwd() + "\\" + "attachments")
+
+    mk_files_dir(FILES_DIR)
 
     for i in track(mii, description="Идет загрузка вложений..."):
         for j in i.Attachments:  # https://docs.microsoft.com/ru-ru/office/vba/api/outlook.mailitem#properties
-            file_path = os.path.join(os.getcwd() + 'attachments', get_create_date(j) + j.FileName)
+            file_path = os.path.join(FILES_DIR, get_name_file(j))
             j.SaveAsFile(file_path)
 
     console.input("[blink dodger_blue3](press Enter to exit)[/blink dodger_blue3]")
